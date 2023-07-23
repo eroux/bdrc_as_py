@@ -1,0 +1,24 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table ocfl_objects {
+  id mediumint [pk, note: 'internal identifier'] // UNSIGNED
+  bdrc_id varchar(32) [not null, note: 'the BDRC RID (ex: W22084), unique persistent identifier, ASCII string no longer than 32 characters'] // CHARACTER SET ascii
+  created_at timestamp [note: 'the timestamp of the creation of the object, or the equivalent object in a previous archive storage']
+  last_modified_at timestamp [note: 'the timestamp of the last known modification']
+  ocfl_storage_root_id tinyint [not null, ref: - ocfl_storage_roots.id , note: 'the OCFL stoage root id that the object is stored in'] // UNSIGNED
+
+  Note: 'OCFL objects kept on archive storage (scans, etexts or others)'
+}
+
+Table ocfl_storage_roots {
+  id tinyint [pk, note: 'internal identifier of the root object'] // UNSIGNED
+  name varchar(32) [note: 'name of the OCFL Storage root (ASCII), used to fint it on disk (ex: Archive0). The actual disk path depends on the mount points on the servers.']  // CHARACTER SET ascii
+  storage_layout varchar(50) [note: 'name of the storage layout, ASCII']  // CHARACTER SET ascii
+
+  Note: 'OCFL storage roots'
+}
+
+Table content_file {
+  id 
+}
