@@ -1,24 +1,99 @@
 // Use DBML to define your database structure
 // Docs: https://dbml.dbdiagram.io/docs
 
-Table ocfl_objects {
-  id mediumint [pk, note: 'internal identifier'] // UNSIGNED
+Table storage_objects {
+  id mediumint [pk, increment, note: 'internal identifier'] // UNSIGNED
   bdrc_id varchar(32) [not null, note: 'the BDRC RID (ex: W22084), unique persistent identifier, ASCII string no longer than 32 characters'] // CHARACTER SET ascii
-  created_at timestamp [note: 'the timestamp of the creation of the object, or the equivalent object in a previous archive storage']
-  last_modified_at timestamp [note: 'the timestamp of the last known modification']
-  ocfl_storage_root_id tinyint [not null, ref: - ocfl_storage_roots.id , note: 'the OCFL stoage root id that the object is stored in'] // UNSIGNED
+  created_at timestamp [null, note: 'the timestamp of the creation of the object, or the equivalent object in a previous archive storage']
+  last_modified_at timestamp [null, note: 'the timestamp of the last known modification']
+  storage_root_id tinyint [not null, ref: - storage_roots.id , note: 'the OCFL stoage root id that the object is stored in'] // UNSIGNED
+
+  indexes {
+    (bdrc_id, storage_root_id) [unique, note: 'a BDRC id can only appear once per storage root']
+  }
 
   Note: 'OCFL objects kept on archive storage (scans, etexts or others)'
 }
 
-Table ocfl_storage_roots {
-  id tinyint [pk, note: 'internal identifier of the root object'] // UNSIGNED
-  name varchar(32) [note: 'name of the OCFL Storage root (ASCII), used to fint it on disk (ex: Archive0). The actual disk path depends on the mount points on the servers.']  // CHARACTER SET ascii
-  storage_layout varchar(50) [note: 'name of the storage layout, ASCII']  // CHARACTER SET ascii
+Table storage_roots {
+  id tinyint [pk, increment, note: 'internal identifier of the root object'] // UNSIGNED
+  name varchar(32) [not null, note: 'name of the Storage root (in ASCII), used to fint it on disk (ex: Archive0). The actual disk path depends on the mount points on the servers.']  // CHARACTER SET ascii
+  storage_layout varchar(50) [not null, note: 'name of the storage layout, ASCII']  // CHARACTER SET ascii
 
-  Note: 'OCFL storage roots'
+  Note: 'storage roots'
 }
 
-Table content_file {
-  id 
+enum file_type {
+  image
+  pdf
+  etext
+  other
+}
+
+Table content_files {
+  id int [pk, increment] // UNSIGNED
+  sha256 binary(32) [not null, note: 'Digest. OCFL recommends sha512 but S3 only makes available sha256 so far']
+  size bigint [not null, note: 'the size in bytes'] // UNSIGNED
+  persistent_id binary(32) [unique, not null, note: 'persistent identifier for the file, owned by Archive Storage. The identifier is globally unique for the BDRC archive. By construction it is the sha256 or a random id in case of collision.']
+  file_type file_type
+  created_at timestamp [null, note: 'the creation date of the file. Often unknown or unreliable, can be set to the earlier mtime exposed by the FS']
+  earliest_mdate timestamp [null, note: 'the earliest modification date for the file (optional)']
+
+  indexes {
+    (sha256, size) [unique, note: 'We assume that there will not be sha256 collisions on files of the same size']
+  }
+
+  Note: 'Table of all the (deduplicated) actual files handled by Archive Storage'
+}
+
+Table content_paths {
+  content_file_id int [ref: - content_files.id] // UNSIGNED
+  storage_object mediumint [ref: - storage_objects.id] // UNSIGNED
+  content_path varchar(1024) [note: 'Unicode string (256 Unicode characters max) representing the (case sensitive) content paths in OCFL objects for each content file.'] // CHARACTER SET utf8mb4
+
+  Note: 'Table connecting files and their content paths in storage objects'
+}
+
+enum image_type {
+    jpg
+    png
+    single_image_tiff
+    jp2
+}
+
+enum image_mode {
+    1
+    L
+    RGB
+    RGBA
+    CMYK
+    P
+    OTHER
+}
+
+enum tiff_compression {
+  raw
+  tiff_ccitt
+  group3
+  group4
+  tiff_lzw
+  tiff_jpeg // obsolete / invalid
+  jpeg
+  tiff_adobe_deflate // or just tiff_deflate
+  lzma
+  other
+}
+
+Table content_file_scan_info {
+  content_file_id int [pk, ref: - content_files.id]
+  image_type image_type [not null]
+  image_mode image_mode [not null]
+  tiff_compression tiff_compression [null, note: 'names are from PIL version 10']
+  width smallint [not null, note: 'width of the bitmap (not taking a potential exif rotation into account)']
+  height smallint [not null, note: 'height of the bitmap (not taking a potential exif rotation into account)']
+  quality tinyint [null, note: 'relevant only for jpg, png and single_image_tiff encoded as jpg: quality of encoding. JPEG is represented between 0 and 100. For PNG this column encodes the compression between 0 and 9.'] // UNSIGNED
+  bps tinyint [not null, note: 'bits per sample'] // UNSIGNED
+  recorded_date timestamp [null, note: 'the timestamp recorded in the metadata']
+
+  Note: 'Table containing information about image files'
 }
