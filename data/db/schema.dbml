@@ -3,10 +3,10 @@ Table storage.objects {
   bdrc_id varchar(32) [not null, note: 'the BDRC RID (ex: W22084), unique persistent identifier, ASCII string no longer than 32 characters'] // CHARACTER SET ascii
   created_at timestamp [null, note: 'the timestamp of the creation of the object, or the equivalent object in a previous archive storage']
   last_modified_at timestamp [null, note: 'the timestamp of the last known modification']
-  root_id tinyint [not null, ref: - storage.roots.id , note: 'the OCFL stoage root id that the object is stored in'] // UNSIGNED
+  root tinyint [not null, ref: - storage.roots.id , note: 'the OCFL stoage root id that the object is stored in'] // UNSIGNED
 
   indexes {
-    (bdrc_id, root_id) [unique, note: 'a BDRC id can only appear once per storage root']
+    (bdrc_id, root) [unique, note: 'a BDRC id can only appear once per storage root']
   }
 
   Note: 'Objects kept on archive storage'
@@ -36,11 +36,18 @@ Table storage.files {
 }
 
 Table storage.paths {
-  file_id int [ref: - storage.files.id] // UNSIGNED
+  file int [ref: - storage.files.id] // UNSIGNED
   storage_object mediumint [ref: - storage.objects.id] // UNSIGNED
   path varchar(1024) [note: 'Unicode string (256 Unicode characters max) representing the (case sensitive) content paths in OCFL objects for each content file.'] // CHARACTER SET utf8mb4
 
   Note: 'Table connecting files and their content paths in storage objects'
+}
+
+Table storage.users {
+  id smallint [pk] // UNSIGNED
+  name varchar(256) [note: "A name for the user, limitted to 64 characters"]  // CHARACTER SET utf8mb4
+
+  Note: 'While not used in the other storage tables, users should be shared'
 }
 
 enum etext_type {
@@ -56,8 +63,40 @@ enum etext_type {
 }
 
 Table etexts.file_info {
-  content_file_id int [pk, ref: - storage.files.id]
-  image_type image_type [not null]
+  content_file int [pk, ref: - storage.files.id]
+  etext_type etext_type [not null]
+  nb_unicode_chars mediumint [null, note: 'the number of Unicode characters'] // UNSIGNED
+
+  Note: 'Domain-specific information record about relevant files (not every file needs to have an entry in this table)'
+}
+
+Table etexts.ocfl_versions {
+  storage_object mediumint [pk, ref: - storage.objects.id ] // UNSIGNED
+  version smallint [note: 'The OCFL version of the object'] // UNSIGNED
+  created_at timestamp [not null, note: 'the creation time']
+  user smallint [not null, note: 'the user who created the version'] // UNSIGNED
+  message varchar (256) [null, note: 'the message of the version in Unicode, truncated to 64 characters'] // CHARACTER SET utf8mb4
+
+  indexes {
+    (storage_object, version) [unique, note: 'One entry per version']
+  }
+
+  Note: 'A table recording the OCFL versions of all the objects'
+}
+
+Table etexts.ocfl_objects_latest_version {
+  storage_object mediumint [pk, ref: - storage.objects.id ] // UNSIGNED
+  latest_version smallint [not null, note: 'The latest OCFL version as integer'] // UNSIGNED
+
+  Note: 'A table recording the most recent version of an OCFL object, as an integer'
+}
+
+Table etexts.ocfl_logical_paths {
+  storage_file int [ref: - storage.files.id] // UNSIGNED
+  storage_object mediumint [ref: - storage.objects.id ] // UNSIGNED
+  ocfl_object_version smallint [not null, note: 'the version of the object that corresponds to this logical path']
+
+  Note: 'This table represents the logical state of each version (see OCFL spec)'
 }
 
 enum image_type {
@@ -91,12 +130,12 @@ enum tiff_compression {
 }
 
 Table images.file_infos {
-  content_file_id int [pk, ref: - storage.files.id]
+  storage_file int [pk, ref: - storage.files.id] // UNSIGNED
   image_type image_type [not null]
   image_mode image_mode [not null]
   tiff_compression tiff_compression [null, note: 'names are from PIL version 10']
-  width smallint [not null, note: 'width of the bitmap (not taking a potential exif rotation into account)']
-  height smallint [not null, note: 'height of the bitmap (not taking a potential exif rotation into account)']
+  width smallint [not null, note: 'width of the bitmap (not taking a potential exif rotation into account)']  // UNSIGNED
+  height smallint [not null, note: 'height of the bitmap (not taking a potential exif rotation into account)']  // UNSIGNED
   quality tinyint [null, note: 'relevant only for jpg, png and single_image_tiff encoded as jpg: quality of encoding. JPEG is represented between 0 and 100. For PNG this column encodes the compression between 0 and 9.'] // UNSIGNED
   bps tinyint [not null, note: 'bits per sample'] // UNSIGNED
   recorded_date timestamp [null, note: 'the timestamp recorded in the metadata']
