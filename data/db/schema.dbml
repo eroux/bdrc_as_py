@@ -43,11 +43,44 @@ Table storage.paths {
   Note: 'Table connecting files and their content paths in storage objects'
 }
 
-Table storage.users {
+Table ocfl_storage.users {
   id smallint [pk] // UNSIGNED
+  handle varchar(16) [note: "A user name / handle for the command line"]
   name varchar(256) [note: "A name for the user, limitted to 64 characters"]  // CHARACTER SET utf8mb4
 
-  Note: 'While not used in the other storage tables, users should be shared'
+  Note: 'Users in the OCFL manifests'
+}
+
+Table ocfl_storage.versions {
+  storage_object mediumint [pk, ref: - storage.objects.id ] // UNSIGNED
+  version smallint [note: 'The OCFL version of the object'] // UNSIGNED
+  created_at timestamp [not null, note: 'the creation time (after the transaction)']
+  user smallint [not null, ref: - ocfl_storage.users.id, note: 'the user who created the version'] // UNSIGNED
+  message varchar (256) [null, note: 'the message of the version in Unicode, truncated to 64 characters'] // CHARACTER SET utf8mb4
+  transaction_number mediumint [null, note: 'the transaction id in case of a transaction in progress']
+
+  indexes {
+    (storage_object, version) [unique, note: 'One entry per version']
+    (transaction_number) [unique]
+  }
+
+  Note: 'A table recording the OCFL versions of all the objects'
+}
+
+Table ocfl_storage.objects_latest_version {
+  storage_object mediumint [pk, ref: - storage.objects.id ] // UNSIGNED
+  latest_version smallint [not null, note: 'The latest OCFL version as integer'] // UNSIGNED
+
+  Note: 'A table recording the most recent version of an OCFL object, as an integer'
+}
+
+Table ocfl_storage.logical_paths {
+  storage_file int [ref: - storage.files.id] // UNSIGNED
+  storage_object mediumint [ref: - storage.objects.id ] // UNSIGNED
+  object_version smallint [not null, note: 'the version of the object that corresponds to this logical path']
+  path varchar(1024) [note: 'Unicode string (256 Unicode characters max) representing the (case sensitive) content paths in OCFL objects for each content file.'] // CHARACTER SET utf8mb4
+
+  Note: 'This table represents the logical state of each version (see OCFL spec)'
 }
 
 enum etext_type {
@@ -68,35 +101,6 @@ Table etexts.file_info {
   nb_unicode_chars mediumint [null, note: 'the number of Unicode characters'] // UNSIGNED
 
   Note: 'Domain-specific information record about relevant files (not every file needs to have an entry in this table)'
-}
-
-Table etexts.ocfl_versions {
-  storage_object mediumint [pk, ref: - storage.objects.id ] // UNSIGNED
-  version smallint [note: 'The OCFL version of the object'] // UNSIGNED
-  created_at timestamp [not null, note: 'the creation time']
-  user smallint [not null, note: 'the user who created the version'] // UNSIGNED
-  message varchar (256) [null, note: 'the message of the version in Unicode, truncated to 64 characters'] // CHARACTER SET utf8mb4
-
-  indexes {
-    (storage_object, version) [unique, note: 'One entry per version']
-  }
-
-  Note: 'A table recording the OCFL versions of all the objects'
-}
-
-Table etexts.ocfl_objects_latest_version {
-  storage_object mediumint [pk, ref: - storage.objects.id ] // UNSIGNED
-  latest_version smallint [not null, note: 'The latest OCFL version as integer'] // UNSIGNED
-
-  Note: 'A table recording the most recent version of an OCFL object, as an integer'
-}
-
-Table etexts.ocfl_logical_paths {
-  storage_file int [ref: - storage.files.id] // UNSIGNED
-  storage_object mediumint [ref: - storage.objects.id ] // UNSIGNED
-  ocfl_object_version smallint [not null, note: 'the version of the object that corresponds to this logical path']
-
-  Note: 'This table represents the logical state of each version (see OCFL spec)'
 }
 
 enum image_type {

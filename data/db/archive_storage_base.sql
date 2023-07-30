@@ -1,5 +1,7 @@
 CREATE SCHEMA `storage`;
 
+CREATE SCHEMA `ocfl_storage`;
+
 CREATE SCHEMA `etexts`;
 
 CREATE SCHEMA `images`;
@@ -33,8 +35,9 @@ CREATE TABLE `storage`.`paths` (
   `path` varchar(1024) CHARACTER SET utf8mb4 COMMENT 'Unicode string (256 Unicode characters max) representing the (case sensitive) content paths in OCFL objects for each content file.'
 );
 
-CREATE TABLE `storage`.`users` (
+CREATE TABLE `ocfl_storage`.`users` (
   `id` smallint UNSIGNED PRIMARY KEY,
+  `handle` varchar(16) CHARACTER SET ascii COMMENT 'A user name / handle for the command line',
   `name` varchar(256) CHARACTER SET utf8mb4 COMMENT 'A name for the user, limitted to 64 characters'
 );
 
@@ -44,23 +47,24 @@ CREATE TABLE `etexts`.`file_info` (
   `nb_unicode_chars` mediumint UNSIGNED COMMENT 'the number of Unicode characters'
 );
 
-CREATE TABLE `etexts`.`ocfl_versions` (
+CREATE TABLE `ocfl_storage`.`versions` (
   `storage_object` mediumint UNSIGNED PRIMARY KEY,
   `version` smallint UNSIGNED COMMENT 'The OCFL version of the object',
   `created_at` timestamp NOT NULL COMMENT 'the creation time',
   `user` smallint UNSIGNED NOT NULL COMMENT 'the user who created the version',
   `message` varchar(256) CHARACTER SET utf8mb4 COMMENT 'the message of the version in Unicode, truncated to 64 characters'
+  `transaction_number` mediumint UNSIGNED COMMENT 'the transaction id in case of a transaction in progress'
 );
 
-CREATE TABLE `etexts`.`ocfl_objects_latest_version` (
+CREATE TABLE `ocfl_storage`.`objects_latest_version` (
   `storage_object` mediumint UNSIGNED PRIMARY KEY,
   `latest_version` smallint UNSIGNED NOT NULL COMMENT 'The latest OCFL version as integer'
 );
 
-CREATE TABLE `etexts`.`ocfl_logical_paths` (
+CREATE TABLE `ocfl_storage`.`logical_paths` (
   `storage_file` int UNSIGNED,
   `storage_object` mediumint UNSIGNED,
-  `ocfl_object_version` smallint UNSIGNED NOT NULL COMMENT 'the version of the object that corresponds to this logical path'
+  `object_version` smallint UNSIGNED NOT NULL COMMENT 'the version of the object that corresponds to this logical path'
 );
 
 CREATE TABLE `images`.`file_infos` (
@@ -79,7 +83,9 @@ CREATE UNIQUE INDEX ``storage`.objects_index_0` ON `storage`.`objects` (`bdrc_id
 
 CREATE UNIQUE INDEX ``storage`.files_index_1` ON `storage`.`files` (`sha256`, `size`);
 
-CREATE UNIQUE INDEX ``etexts`.ocfl_versions_index_0` ON `etexts`.`ocfl_versions` (`storage_object`, `version`);
+CREATE UNIQUE INDEX ``ocfl_storage`.ocfl_versions_index_0` ON `ocfl_storage`.`ocfl_versions` (`storage_object`, `version`);
+
+CREATE UNIQUE INDEX ``ocfl_storage`.ocfl_versions_index_1` ON `ocfl_storage`.`ocfl_versions` (`transaction_number`);
 
 ALTER TABLE `storage`.`objects` COMMENT = 'Objects kept on archive storage';
 
@@ -89,15 +95,15 @@ ALTER TABLE `storage`.`files` COMMENT = 'Table of all the (deduplicated) actual 
 
 ALTER TABLE `storage`.`paths` COMMENT = 'Table connecting files and their content paths in storage objects';
 
-ALTER TABLE `storage`.`users` COMMENT = 'While not used in the other storage tables, users should be shared';
+ALTER TABLE `ocfl_storage`.`users` COMMENT = 'Users in the OCFL manifests';
 
 ALTER TABLE `etexts`.`file_info` COMMENT = 'Domain-specific information record about relevant files (not every file needs to have an entry in this table)';
 
-ALTER TABLE `etexts`.`ocfl_versions` COMMENT = 'A table recording the OCFL versions of all the objects';
+ALTER TABLE `ocfl_storage`.`versions` COMMENT = 'A table recording the OCFL versions of all the objects';
 
-ALTER TABLE `etexts`.`ocfl_objects_latest_version` COMMENT = 'A table recording the most recent version of an OCFL object, as an integer';
+ALTER TABLE `ocfl_storage`.`objects_latest_version` COMMENT = 'A table recording the most recent version of an OCFL object, as an integer';
 
-ALTER TABLE `etexts`.`ocfl_logical_paths` COMMENT = 'This table represents the logical state of each version (see OCFL spec)';
+ALTER TABLE `ocfl_storage`.`logical_paths` COMMENT = 'This table represents the logical state of each version (see OCFL spec)';
 
 ALTER TABLE `images`.`file_infos` COMMENT = 'Table containing information about image files';
 
@@ -109,12 +115,14 @@ ALTER TABLE `storage`.`paths` ADD FOREIGN KEY (`storage_object`) REFERENCES `sto
 
 ALTER TABLE `etexts`.`file_info` ADD FOREIGN KEY (`content_file`) REFERENCES `storage`.`files` (`id`);
 
-ALTER TABLE `etexts`.`ocfl_versions` ADD FOREIGN KEY (`storage_object`) REFERENCES `storage`.`objects` (`id`);
+ALTER TABLE `ocfl_storage`.`versions` ADD FOREIGN KEY (`storage_object`) REFERENCES `storage`.`objects` (`id`);
 
-ALTER TABLE `etexts`.`ocfl_objects_latest_version` ADD FOREIGN KEY (`storage_object`) REFERENCES `storage`.`objects` (`id`);
+ALTER TABLE `ocfl_storage`.`versions` ADD FOREIGN KEY (`user`) REFERENCES `ocfl_storage`.`users` (`id`);
 
-ALTER TABLE `etexts`.`ocfl_logical_paths` ADD FOREIGN KEY (`storage_file`) REFERENCES `storage`.`files` (`id`);
+ALTER TABLE `ocfl_storage`.`objects_latest_version` ADD FOREIGN KEY (`storage_object`) REFERENCES `storage`.`objects` (`id`);
 
-ALTER TABLE `etexts`.`ocfl_logical_paths` ADD FOREIGN KEY (`storage_object`) REFERENCES `storage`.`objects` (`id`);
+ALTER TABLE `ocfl_storage`.`logical_paths` ADD FOREIGN KEY (`storage_file`) REFERENCES `storage`.`files` (`id`);
+
+ALTER TABLE `ocfl_storage`.`logical_paths` ADD FOREIGN KEY (`storage_object`) REFERENCES `storage`.`objects` (`id`);
 
 ALTER TABLE `images`.`file_infos` ADD FOREIGN KEY (`storage_file_id`) REFERENCES `storage`.`files` (`id`);
