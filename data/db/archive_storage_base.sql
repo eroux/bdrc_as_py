@@ -32,19 +32,29 @@ CREATE TABLE `storage`.`files` (
 CREATE TABLE `storage`.`paths` (
   `file` int UNSIGNED,
   `storage_object` mediumint UNSIGNED,
-  `path` varchar(1024) CHARACTER SET utf8mb4 COMMENT 'Unicode string (256 Unicode characters max) representing the (case sensitive) content paths in OCFL objects for each content file.'
+  `path` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT 'Unicode string (256 Unicode characters max) representing the (case sensitive) content paths in OCFL objects for each content file.'
 );
 
 CREATE TABLE `ocfl_storage`.`users` (
   `id` smallint UNSIGNED PRIMARY KEY,
   `handle` varchar(16) CHARACTER SET ascii COMMENT 'A user name / handle for the command line',
-  `name` varchar(256) CHARACTER SET utf8mb4 COMMENT 'A name for the user, limitted to 64 characters'
+  `name` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT 'A name for the user, limitted to 64 characters'
 );
 
 CREATE TABLE `etexts`.`file_info` (
-  `content_file` int UNSIGNED PRIMARY KEY,
+  `storage_file` int PRIMARY KEY,
   `etext_type` ENUM ('doc', 'docx', 'tibet_doc', 'rtf', 'pdf', 'xml', 'tei_xml', 'txt', 'indd') NOT NULL,
   `nb_unicode_chars` mediumint UNSIGNED COMMENT 'the number of Unicode characters'
+);
+
+CREATE TABLE `ocfl_storage`.`transactions` (
+  `id` mediumint,
+  `storage_object` mediumint,
+  `version` smallint COMMENT 'The OCFL version of the object',
+  `created_at` timestamp NOT NULL COMMENT 'the transaction start time',
+  `finished_at` timestamp NOT NULL COMMENT 'the transaction start time',
+  `user` smallint NOT NULL COMMENT 'the user who started the transaction',
+  PRIMARY KEY (`id`)
 );
 
 CREATE TABLE `ocfl_storage`.`versions` (
@@ -52,8 +62,7 @@ CREATE TABLE `ocfl_storage`.`versions` (
   `version` smallint UNSIGNED COMMENT 'The OCFL version of the object',
   `created_at` timestamp NOT NULL COMMENT 'the creation time',
   `user` smallint UNSIGNED NOT NULL COMMENT 'the user who created the version',
-  `message` varchar(256) CHARACTER SET utf8mb4 COMMENT 'the message of the version in Unicode, truncated to 64 characters'
-  `transaction_number` mediumint UNSIGNED COMMENT 'the transaction id in case of a transaction in progress'
+  `message` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT 'the message of the version in Unicode, truncated to 64 characters'
 );
 
 CREATE TABLE `ocfl_storage`.`objects_latest_version` (
@@ -83,6 +92,10 @@ CREATE UNIQUE INDEX ``storage`.objects_index_0` ON `storage`.`objects` (`bdrc_id
 
 CREATE UNIQUE INDEX ``storage`.files_index_1` ON `storage`.`files` (`sha256`, `size`);
 
+CREATE INDEX ``ocfl_storage`.transactions_index_0` ON `ocfl_storage`.`transactions` (`storage_object`);
+
+CREATE UNIQUE INDEX ``ocfl_storage`.transactions_index_1` ON `ocfl_storage`.`transactions` (`storage_object`, `version`);
+
 CREATE UNIQUE INDEX ``ocfl_storage`.ocfl_versions_index_0` ON `ocfl_storage`.`ocfl_versions` (`storage_object`, `version`);
 
 CREATE UNIQUE INDEX ``ocfl_storage`.ocfl_versions_index_1` ON `ocfl_storage`.`ocfl_versions` (`transaction_number`);
@@ -99,6 +112,8 @@ ALTER TABLE `ocfl_storage`.`users` COMMENT = 'Users in the OCFL manifests';
 
 ALTER TABLE `etexts`.`file_info` COMMENT = 'Domain-specific information record about relevant files (not every file needs to have an entry in this table)';
 
+ALTER TABLE `ocfl_storage`.`transactions` COMMENT = 'A table recording the transactions to create OCFL versions';
+
 ALTER TABLE `ocfl_storage`.`versions` COMMENT = 'A table recording the OCFL versions of all the objects';
 
 ALTER TABLE `ocfl_storage`.`objects_latest_version` COMMENT = 'A table recording the most recent version of an OCFL object, as an integer';
@@ -112,6 +127,10 @@ ALTER TABLE `storage`.`objects` ADD FOREIGN KEY (`root`) REFERENCES `storage`.`r
 ALTER TABLE `storage`.`paths` ADD FOREIGN KEY (`file`) REFERENCES `storage`.`files` (`id`);
 
 ALTER TABLE `storage`.`paths` ADD FOREIGN KEY (`storage_object`) REFERENCES `storage`.`objects` (`id`);
+
+ALTER TABLE `ocfl_storage`.`transactions` ADD FOREIGN KEY (`storage_object`) REFERENCES `storage`.`objects` (`id`);
+
+ALTER TABLE `ocfl_storage`.`transactions` ADD FOREIGN KEY (`user`) REFERENCES `ocfl_storage`.`users` (`id`);
 
 ALTER TABLE `etexts`.`file_info` ADD FOREIGN KEY (`content_file`) REFERENCES `storage`.`files` (`id`);
 

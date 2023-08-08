@@ -51,17 +51,31 @@ Table ocfl_storage.users {
   Note: 'Users in the OCFL manifests'
 }
 
+Table ocfl_storage.transactions {
+  id mediumint [pk]
+  storage_object mediumint [ref: - storage.objects.id ] // UNSIGNED
+  version smallint [note: 'The OCFL version of the object'] // UNSIGNED
+  created_at timestamp [not null, note: 'the transaction start time']
+  finished_at timestamp [not null, note: 'the transaction start time']
+  user smallint [not null, ref: - ocfl_storage.users.id, note: 'the user who started the transaction'] // UNSIGNED
+
+  indexes {
+    (storage_object) [note: 'Index on storage objects']
+    (storage_object, version) [unique, note: 'One entry per version']
+  }
+
+  Note: 'A table recording the transactions to create OCFL versions'
+}
+
 Table ocfl_storage.versions {
   storage_object mediumint [pk, ref: - storage.objects.id ] // UNSIGNED
-  version smallint [note: 'The OCFL version of the object'] // UNSIGNED
+  version smallint [pk, note: 'The OCFL version of the object'] // UNSIGNED
   created_at timestamp [not null, note: 'the creation time (after the transaction)']
   user smallint [not null, ref: - ocfl_storage.users.id, note: 'the user who created the version'] // UNSIGNED
   message varchar (256) [null, note: 'the message of the version in Unicode, truncated to 64 characters'] // CHARACTER SET utf8mb4
-  transaction_number mediumint [null, note: 'the transaction id in case of a transaction in progress']
 
   indexes {
     (storage_object, version) [unique, note: 'One entry per version']
-    (transaction_number) [unique]
   }
 
   Note: 'A table recording the OCFL versions of all the objects'
@@ -96,7 +110,7 @@ enum etext_type {
 }
 
 Table etexts.file_info {
-  content_file int [pk, ref: - storage.files.id]
+  storage_file int [pk, ref: - storage.files.id]
   etext_type etext_type [not null]
   nb_unicode_chars mediumint [null, note: 'the number of Unicode characters'] // UNSIGNED
 

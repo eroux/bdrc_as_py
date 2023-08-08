@@ -32,12 +32,20 @@ Starts a transaction (creation of a new version), returns a transaction_id.
 
 Raises an exception if a transaction is already in progress.
 
-##### end_transaction(transaction_id, commit_message) -> version_number
+##### complete_transaction(transaction_id, commit_message) -> version_number
 
-Ends a transaction by fully copying the files and returns the version number.
+Completes a transaction:
+- creates the OCFL manifests
+- updates the object's latest version reference
+- removes references to the transaction in the database
 
 ##### abort_transaction(transaction_id)
 
-Aborts a transaction
+Aborts a transaction:
+- remove the version directory in the archive
+- removes the logical paths of the version in the database
+- removes references to the transaction in the database
 
-##### set_logical_file(storage_object_id, transaction_id, logical_path, content_file_id)
+##### set_logical_path(transaction_id, logical_path, content_file_id)
+
+s
